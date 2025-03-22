@@ -1,0 +1,42 @@
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
+import requests
+import os
+
+# Get API keys from environment variables
+ZAMZAR_API_KEY = os.getenv("83856c566ecf7a35ef3ba5ee9d3591726aacd6ee")
+BOT_TOKEN = os.getenv("7840312089:AAGh64JEQ8Z5FuYDVv-lUvrrmKj40DnGRzc")
+
+async def start(update: Update, context):
+    await update.message.reply_text("Send me an MP4 file, and I'll convert it to MKV!")
+
+async def handle_video(update: Update, context):
+    file = await update.message.video.get_file()
+    file_path = file.file_path  # This is a Telegram file URL
+
+    # Download the video from Telegram
+    video_filename = "input_video.mp4"
+    await file.download_to_drive(video_filename)
+
+    # Upload the video to Zamzar
+    with open(video_filename, "rb") as video_file:
+        response = requests.post(
+            "https://sandbox.zamzar.com/v1/jobs",
+            auth=(ZAMZAR_API_KEY, ""),
+            files={"source_file": video_file},
+            data={"target_format": "mkv"}
+        )
+
+    if response.status_code == 201:
+        await update.message.reply_text("Conversion started! You'll receive your MKV file soon.")
+    else:
+        await update.message.reply_text(f"Error: {response.json().get('message', 'Something went wrong.')}")
+
+# Create bot application
+app = Application.builder().token(BOT_TOKEN).build()
+app.add_handler(CommandHandler("start", start))
+app.add_handler(MessageHandler(filters.VIDEO, handle_video))
+
+# Run bot
+if __name__ == "__main__":
+    app.run_polling()
